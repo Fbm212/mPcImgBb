@@ -239,29 +239,23 @@
             transform: scale(0.98);
         }
 
-        /* Buttons Container */
-        .buttons-container {
-            display: flex;
-            gap: 10px;
-            align-items: center;
-            margin-top: 20px;
+        /* Download Progress */
+        .download-progress {
+            width: 100%;
+            height: 4px;
+            background: var(--bg);
+            border-radius: 2px;
+            margin-top: 8px;
+            overflow: hidden;
+            display: none;
         }
 
-        .btn {
-            background: var(--primary);
-            color: white;
-            border: none;
-            border-radius: var(--radius);
-            padding: 15px 20px;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            flex: 1;
+        .download-progress-bar {
+            height: 100%;
+            background: var(--accent);
+            border-radius: 2px;
+            transition: width 0.3s ease;
+            width: 0%;
         }
 
         /* Custom Alert Styles */
@@ -581,6 +575,9 @@
                                 data-code="${image.code}">
                             📥 Download
                         </button>
+                        <div class="download-progress">
+                            <div class="download-progress-bar"></div>
+                        </div>
                     `;
 
                     imageGrid.appendChild(imageCard);
@@ -595,7 +592,7 @@
                     const fileName = this.getAttribute('data-filename');
                     const imageCode = this.getAttribute('data-code');
                     
-                    downloadImage(imageId, imageUrl, fileName, imageCode);
+                    downloadImage(imageId, imageUrl, fileName, imageCode, this);
                 });
             });
 
@@ -611,39 +608,89 @@
             }
         }
 
-        function downloadImage(imageId, imageUrl, fileName, imageCode) {
+        async function downloadImage(imageId, imageUrl, fileName, imageCode, buttonElement) {
             isDownloading = true;
-            showAlert(`Downloading image ${imageCode}...`, 'info');
             
-            // Real download functionality
-            const downloadLink = document.createElement('a');
-            downloadLink.href = imageUrl;
-            downloadLink.download = `${imageCode}_${fileName || 'image'}.jpg`;
-            document.body.appendChild(downloadLink);
-            downloadLink.click();
-            document.body.removeChild(downloadLink);
+            // Show loading state
+            buttonElement.disabled = true;
+            buttonElement.innerHTML = '⏳ Downloading...';
+            
+            const progressBar = buttonElement.nextElementSibling;
+            const progressBarInner = progressBar.querySelector('.download-progress-bar');
+            progressBar.style.display = 'block';
 
-            // Mark image as downloaded locally
-            downloadedImages[imageId] = true;
-            localStorage.setItem('downloadedImages', JSON.stringify(downloadedImages));
-            
-            // Mark image as downloaded globally (simulated server call)
-            markImageAsDownloadedGlobally(imageId);
-            
-            // Update statistics
-            updateStatistics();
-            
-            setTimeout(() => {
-                // Re-render images to hide the downloaded one
-                renderImages();
+            try {
+                // Fetch the image with progress tracking
+                const response = await fetch(imageUrl);
+                const contentLength = response.headers.get('content-length');
+                const total = parseInt(contentLength || '0');
+                let loaded = 0;
+
+                const reader = response.body.getReader();
+                const chunks = [];
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    chunks.push(value);
+                    loaded += value.length;
+
+                    // Update progress bar
+                    if (total > 0) {
+                        const progress = (loaded / total) * 100;
+                        progressBarInner.style.width = `${progress}%`;
+                    }
+                }
+
+                // Complete progress bar
+                progressBarInner.style.width = '100%';
+
+                // Convert chunks to blob
+                const blob = new Blob(chunks);
+                const blobUrl = URL.createObjectURL(blob);
+
+                // Create and trigger download
+                const downloadLink = document.createElement('a');
+                downloadLink.href = blobUrl;
+                downloadLink.download = `${imageCode}_profile_image.jpg`;
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+                document.body.removeChild(downloadLink);
+
+                // Clean up
+                URL.revokeObjectURL(blobUrl);
+
+                // Mark image as downloaded
+                downloadedImages[imageId] = true;
+                localStorage.setItem('downloadedImages', JSON.stringify(downloadedImages));
+                markImageAsDownloadedGlobally(imageId);
                 
+                // Update statistics
+                updateStatistics();
+
+                // Show success message
                 showAlert(`Image ${imageCode} downloaded successfully! This image is now hidden from all users.`, 'success');
+
+                // Re-render images after delay
+                setTimeout(() => {
+                    renderImages();
+                    isDownloading = false;
+                }, 1500);
+
+            } catch (error) {
+                console.error('Download error:', error);
+                showAlert('Download failed. Please try again.', 'error');
                 
-                // Reset timer on download
-                refreshTimer = AUTO_REFRESH_TIME;
+                // Reset button state
+                buttonElement.disabled = false;
+                buttonElement.innerHTML = '📥 Download';
+                progressBar.style.display = 'none';
                 isDownloading = false;
-                
-            }, 1000);
+            }
+
+            // Reset timer on download
+            refreshTimer = AUTO_REFRESH_TIME;
         }
 
         function markImageAsDownloadedGlobally(imageId) {
