@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>mPc Clone Profile Image</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        /* আপনার সকল CSS স্টাইল একই থাকবে */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Hind Siliguri', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --secondary: #8b5cf6;
+            --accent: #06d6a0;
+            --error: #ef4444;
+            --warning: #f59e0b;
+            --text: #1e293b;
+            --text-light: #64748b;
+            --bg: #f8fafc;
+            --card: #ffffff;
+            --shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+            --radius: 16px;
+        }
+
+        .dark-mode {
+            --text: #f1f5f9;
+            --text-light: #94a3b8;
+            --bg: #0f172a;
+            --card: #1e293b;
+            --shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4);
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            transition: all 0.3s ease;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 400px;
+            margin: 0 auto;
+            padding: 8px;
+            min-height: 100vh;
+            position: relative;
+        }
+
+        /* Header Styles */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding: 5px 0;
+            margin-bottom: 20px;
+            position: relative;
+        }
+
+        .user-profile {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex: 1;
+        }
+
+        .profile-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .profile-name {
+            font-weight: 600;
+            font-size: 1.1rem;
+            margin-bottom: 8px;
+            white-space: normal;
+            overflow: visible;
+            text-overflow: unset;
+            line-height: 1.4;
+            text-align: left;
+            color: var(--text);
+        }
+
+        .profile-subtitle {
+            font-size: 0.95rem;
+            font-weight: 500;
+            color: var(--text-light);
+            opacity: 0.7;
+            text-align: left;
+            margin-top: 4px;
+        }
+
+        .profile-details {
+            font-size: 0.8rem;
+            color: var(--text-light);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            text-align: left;
+        }
+
+        /* Timer Styles */
+        .timer-container {
+            position: absolute;
+            top: 0;
+            right: 0;
+            background: var(--primary);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            box-shadow: var(--shadow);
+        }
+
+        .timer-icon {
+            font-size: 0.9rem;
+        }
+
+        /* Image Grid Styles */
+        .image-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .image-card {
+            background: var(--card);
+            border-radius: var(--radius);
+            padding: 12px;
+            box-shadow: var(--shadow);
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .image-card.hidden {
+            display: none;
+        }
+
+        .image-card.downloaded {
+            opacity: 0.6;
+            filter: grayscale(100%);
+        }
+
+        .image-code {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            background: var(--primary);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            z-index: 2;
+        }
+
+        .image-container {
+            margin-bottom: 10px;
+            border-radius: 12px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .image-container img {
+            width: 100%;
+            height: 150px;
+            object-fit: cover;
+            display: block;
+            border-radius: 8px;
+        }
+
+        .download-btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: var(--radius);
+            padding: 10px;
+            width: 100%;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+        }
+
+        .download-btn:disabled {
+            background: var(--text-light);
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        .download-btn:active:not(:disabled) {
+            transform: scale(0.98);
+        }
+
+        /* Buttons Container */
+        .buttons-container {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-top: 20px;
+        }
+
+        .back-btn-bottom {
+            background: var(--card);
+            width: 50px;
+            height: 50px;
+            border-radius: var(--radius);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 1.2rem;
+            color: var(--text);
+            box-shadow: var(--shadow);
+            border: none;
+            flex-shrink: 0;
+            transition: all 0.3s ease;
+        }
+
+        .btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: var(--radius);
+            padding: 15px 20px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            flex: 1;
+        }
+
+        /* Custom Alert Styles */
+        .custom-alert-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            backdrop-filter: blur(5px);
+        }
+
+        .custom-alert {
+            background: var(--card);
+            border-radius: var(--radius);
+            padding: 24px;
+            box-shadow: var(--shadow);
+            max-width: 400px;
+            width: 90%;
+            border: 2px solid var(--primary);
+            animation: slideIn 0.3s ease;
+        }
+
+        .custom-alert-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .custom-alert-title {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .custom-alert-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            color: var(--text-light);
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+        }
+
+        .custom-alert-content {
+            margin-bottom: 20px;
+            line-height: 1.6;
+            color: var(--text);
+        }
+
+        .custom-alert-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .custom-alert-btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: var(--radius);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+
+        .custom-alert-btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .custom-alert-btn-secondary {
+            background: var(--bg);
+            color: var(--text);
+            border: 1px solid var(--text-light);
+        }
+
+        /* Skeleton Loading */
+        .skeleton-loading {
+            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+            background-size: 200% 100%;
+            animation: loading 1.5s infinite;
+            border-radius: var(--radius);
+        }
+
+        .dark-mode .skeleton-loading {
+            background: linear-gradient(90deg, #334155 25%, #475569 50%, #334155 75%);
+            background-size: 200% 100%;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes loading {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header Section -->
+        <header>
+            <div class="user-profile">
+                <div class="profile-info">
+                    <div class="profile-name" id="userName">mPc Clone Profile Image</div>
+                    <div class="profile-subtitle">Premium Profile Pictures</div>
+                    <div class="profile-details" id="userDetails">Select and download your favorite images</div>
+                </div>
+            </div>
+            <!-- Timer -->
+            <div class="timer-container">
+                <span class="timer-icon">⏱️</span>
+                <span id="timer">20s</span>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main>
+            <!-- Image Gallery Section -->
+            <section class="image-gallery">
+                <div class="image-grid" id="imageGrid">
+                    <!-- Images will be loaded here dynamically -->
+                    <div class="image-card skeleton-loading" style="height: 200px;"></div>
+                    <div class="image-card skeleton-loading" style="height: 200px;"></div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Theme Toggle Button -->
+        <div class="buttons-container">
+            <button class="back-btn-bottom" id="themeToggle">🌓</button>
+            <button class="btn" id="refreshBtn">
+                <span>Refresh Images</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Custom Alert -->
+    <div class="custom-alert-overlay" id="customAlert" style="display: none;">
+        <div class="custom-alert">
+            <div class="custom-alert-header">
+                <div class="custom-alert-title">📥 Download</div>
+                <button class="custom-alert-close" id="alertClose">&times;</button>
+            </div>
+            <div class="custom-alert-content" id="alertMessage">
+                Your image is being downloaded...
+            </div>
+            <div class="custom-alert-buttons">
+                <button class="custom-alert-btn custom-alert-btn-secondary" id="alertCancel">Cancel</button>
+                <button class="custom-alert-btn custom-alert-btn-primary" id="alertOk">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const AUTO_REFRESH_TIME = 20; // 20 seconds
+        const IMAGES_JSON_URL = 'images.json'; // JSON ফাইলের পাথ
+
+        // Telegram Web App Initialization
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        tg.ready();
+
+        // State Management
+        let downloadedImages = JSON.parse(localStorage.getItem('downloadedImages') || '{}');
+        let allImages = [];
+        let refreshTimer = AUTO_REFRESH_TIME;
+        let timerInterval;
+
+        // Theme Management
+        const themeToggle = document.getElementById('themeToggle');
+        const body = document.body;
+
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            body.classList.add('dark-mode');
+            themeToggle.textContent = '☀️';
+        }
+
+        themeToggle.addEventListener('click', () => {
+            body.classList.toggle('dark-mode');
+            const isDark = body.classList.contains('dark-mode');
+            themeToggle.textContent = isDark ? '☀️' : '🌓';
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+        });
+
+        // Timer System
+        function startAutoRefreshTimer() {
+            clearInterval(timerInterval);
+            refreshTimer = AUTO_REFRESH_TIME;
+            updateTimerDisplay();
+            
+            timerInterval = setInterval(() => {
+                refreshTimer--;
+                updateTimerDisplay();
+                
+                if (refreshTimer <= 0) {
+                    refreshTimer = AUTO_REFRESH_TIME;
+                    loadImagesFromJSON();
+                    showAlert('Page auto-refreshed to update images', 'info');
+                }
+            }, 1000);
+        }
+
+        function updateTimerDisplay() {
+            document.getElementById('timer').textContent = `${refreshTimer}s`;
+        }
+
+        // Load Telegram user profile
+        if (tg.initDataUnsafe.user) {
+            const user = tg.initDataUnsafe.user;
+            const userName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Telegram User';
+            const userDetails = `@${user.username || 'no_username'}`;
+            
+            document.getElementById('userName').textContent = userName;
+            document.getElementById('userDetails').textContent = userDetails;
+        }
+
+        // Image Management Functions
+        async function loadImagesFromJSON() {
+            const imageGrid = document.getElementById('imageGrid');
+            imageGrid.innerHTML = `
+                <div class="image-card skeleton-loading" style="height: 200px;"></div>
+                <div class="image-card skeleton-loading" style="height: 200px;"></div>
+            `;
+
+            try {
+                const response = await fetch(IMAGES_JSON_URL);
+                if (!response.ok) {
+                    throw new Error('JSON file not found');
+                }
+                
+                const imagesData = await response.json();
+                allImages = imagesData.images || [];
+                renderImages();
+                
+            } catch (error) {
+                console.error('Error loading images from JSON:', error);
+                showAlert('Error loading images. Please try again.', 'error');
+                
+                // Fallback to empty array if JSON fails
+                allImages = [];
+                renderImages();
+            }
+        }
+
+        function renderImages() {
+            const imageGrid = document.getElementById('imageGrid');
+            imageGrid.innerHTML = '';
+
+            // Get global downloaded images from server (simulated)
+            const globalDownloadedImages = JSON.parse(localStorage.getItem('globalDownloadedImages') || '{}');
+
+            allImages.forEach(image => {
+                const isDownloaded = downloadedImages[image.id] || globalDownloadedImages[image.id];
+                
+                if (!isDownloaded) {
+                    const imageCard = document.createElement('div');
+                    imageCard.className = 'image-card';
+                    
+                    imageCard.innerHTML = `
+                        <div class="image-code">${image.code}</div>
+                        <div class="image-container">
+                            <img src="${image.url}" alt="${image.name}" loading="lazy" onerror="this.src='https://via.placeholder.com/300x200/64748b/ffffff?text=Image+Error'">
+                        </div>
+                        <button class="download-btn" 
+                                data-id="${image.id}" 
+                                data-url="${image.url}" 
+                                data-filename="${image.name}"
+                                data-code="${image.code}">
+                            📥 Download
+                        </button>
+                    `;
+
+                    imageGrid.appendChild(imageCard);
+                }
+            });
+
+            // Add event listeners to download buttons
+            document.querySelectorAll('.download-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const imageId = this.getAttribute('data-id');
+                    const imageUrl = this.getAttribute('data-url');
+                    const fileName = this.getAttribute('data-filename');
+                    const imageCode = this.getAttribute('data-code');
+                    
+                    downloadImage(imageId, imageUrl, fileName, imageCode);
+                });
+            });
+
+            // If no images available
+            if (imageGrid.children.length === 0) {
+                imageGrid.innerHTML = `
+                    <div style="grid-column: 1 / -1; text-align: center; padding: 40px 20px; color: var(--text-light);">
+                        <div style="font-size: 3rem; margin-bottom: 10px;">😔</div>
+                        <div style="font-size: 1.1rem; font-weight: 500;">No images available</div>
+                        <div style="font-size: 0.9rem; margin-top: 5px;">All images have been downloaded</div>
+                    </div>
+                `;
+            }
+        }
+
+        function downloadImage(imageId, imageUrl, fileName, imageCode) {
+            showAlert(`Downloading image ${imageCode}...`, 'info');
+            
+            // Simulate download process
+            setTimeout(() => {
+                // Mark image as downloaded locally
+                downloadedImages[imageId] = true;
+                localStorage.setItem('downloadedImages', JSON.stringify(downloadedImages));
+                
+                // Mark image as downloaded globally (simulated server call)
+                markImageAsDownloadedGlobally(imageId);
+                
+                // Re-render images to hide the downloaded one
+                renderImages();
+                
+                showAlert(`Image ${imageCode} downloaded successfully! This image is now hidden from all users.`, 'success');
+                
+                // Reset timer on download
+                refreshTimer = AUTO_REFRESH_TIME;
+                
+            }, 1500);
+        }
+
+        function markImageAsDownloadedGlobally(imageId) {
+            // Simulate sending to server - in production, this would be a real API call
+            const globalDownloadedImages = JSON.parse(localStorage.getItem('globalDownloadedImages') || '{}');
+            globalDownloadedImages[imageId] = true;
+            localStorage.setItem('globalDownloadedImages', JSON.stringify(globalDownloadedImages));
+            
+            const userData = tg.initDataUnsafe.user || {};
+            const downloadData = {
+                imageId: imageId,
+                userId: userData.id || 'unknown',
+                username: userData.username || 'unknown',
+                timestamp: new Date().toISOString()
+            };
+            
+            console.log('Download tracked globally:', downloadData);
+        }
+
+        // Custom Alert System
+        function showAlert(message, type = 'info') {
+            const alert = document.getElementById('customAlert');
+            const alertMessage = document.getElementById('alertMessage');
+            const alertTitle = document.querySelector('.custom-alert-title');
+            
+            alertMessage.textContent = message;
+            
+            if (type === 'error') {
+                alertTitle.innerHTML = '⚠️ Error';
+                alert.style.borderColor = 'var(--error)';
+            } else if (type === 'success') {
+                alertTitle.innerHTML = '✅ Success';
+                alert.style.borderColor = 'var(--accent)';
+            } else {
+                alertTitle.innerHTML = '📥 Download';
+                alert.style.borderColor = 'var(--primary)';
+            }
+            
+            alert.style.display = 'flex';
+        }
+
+        // Alert event listeners
+        document.getElementById('alertClose').addEventListener('click', () => {
+            document.getElementById('customAlert').style.display = 'none';
+        });
+
+        document.getElementById('alertCancel').addEventListener('click', () => {
+            document.getElementById('customAlert').style.display = 'none';
+        });
+
+        document.getElementById('alertOk').addEventListener('click', () => {
+            document.getElementById('customAlert').style.display = 'none';
+        });
+
+        // Refresh button
+        document.getElementById('refreshBtn').addEventListener('click', () => {
+            refreshTimer = AUTO_REFRESH_TIME;
+            loadImagesFromJSON();
+            showAlert('Images refreshed manually', 'info');
+        });
+
+        // Initialize
+        loadImagesFromJSON();
+        startAutoRefreshTimer();
+    </script>
+</body>
+</html>
