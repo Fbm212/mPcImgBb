@@ -344,41 +344,8 @@
             border: 1px solid var(--text-light);
         }
 
-        /* Ad Loading Overlay */
-        .ad-loading-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.8);
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            z-index: 2000;
-            color: white;
-            text-align: center;
-        }
-
-        .ad-loading-content {
-            background: var(--card);
-            color: var(--text);
-            padding: 30px;
-            border-radius: var(--radius);
-            max-width: 300px;
-            width: 90%;
-        }
-
-        .ad-loading-spinner {
-            width: 40px;
-            height: 40px;
-            border: 4px solid var(--text-light);
-            border-top: 4px solid var(--primary);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 20px;
-        }
+        /* Ad Loading Overlay - REMOVED */
+        /* We don't need extra overlay, just button state change */
 
         /* Skeleton Loading */
         .skeleton-loading {
@@ -407,11 +374,6 @@
         @keyframes loading {
             0% { background-position: 200% 0; }
             100% { background-position: -200% 0; }
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
         }
     </style>
 </head>
@@ -483,18 +445,6 @@
         </div>
     </div>
 
-    <!-- Ad Loading Overlay -->
-    <div class="ad-loading-overlay" id="adLoadingOverlay" style="display: none;">
-        <div class="ad-loading-content">
-            <div class="ad-loading-spinner"></div>
-            <h3>Advertisement</h3>
-            <p>Please watch the ad to download your image...</p>
-            <p style="font-size: 0.8rem; color: var(--text-light); margin-top: 10px;">
-                Ad will auto-close when completed
-            </p>
-        </div>
-    </div>
-
     <script>
         // Configuration
         const AUTO_REFRESH_TIME = 20; // 20 seconds
@@ -513,6 +463,7 @@
         let timerInterval;
         let isDownloading = false;
         let currentDownloadData = null;
+        let isAdRunning = false;
 
         // Theme Management
         const themeToggle = document.getElementById('themeToggle');
@@ -644,7 +595,7 @@
                     const fileName = this.getAttribute('data-filename');
                     const imageCode = this.getAttribute('data-code');
                     
-                    startAdAndDownload(imageId, imageUrl, fileName, imageCode, this);
+                    startAdProcess(imageId, imageUrl, fileName, imageCode, this);
                 });
             });
 
@@ -660,21 +611,18 @@
             }
         }
 
-        // New Ad Integration Function
-        function startAdAndDownload(imageId, imageUrl, fileName, imageCode, buttonElement) {
-            if (isDownloading) return;
+        // New Simplified Ad Process
+        function startAdProcess(imageId, imageUrl, fileName, imageCode, buttonElement) {
+            if (isDownloading || isAdRunning) return;
             
-            isDownloading = true;
+            isAdRunning = true;
             currentDownloadData = { imageId, imageUrl, fileName, imageCode, buttonElement };
 
-            // Show ad loading overlay
-            document.getElementById('adLoadingOverlay').style.display = 'flex';
-            
-            // Show loading state on button
+            // Change button to loading state IMMEDIATELY
             buttonElement.disabled = true;
-            buttonElement.innerHTML = '⏳ Loading Ad<span class="loading-dots"></span>';
+            buttonElement.innerHTML = '⏳ Loading Ad';
 
-            // Initialize Monetag Ads
+            // Start Monetag Ads IMMEDIATELY
             try {
                 show_9802817({
                     type: 'inApp',
@@ -686,54 +634,60 @@
                         everyPage: false
                     },
                     onAdCompleted: function() {
-                        // Ad completed successfully - start download
-                        handleAdCompleted();
+                        // Ad completed - wait for user to close it manually
+                        console.log('Ad completed, waiting for user to close...');
                     },
                     onAdError: function(error) {
-                        // Ad failed - proceed with download anyway
+                        // Ad failed - reset button and state
                         console.error('Ad error:', error);
-                        handleAdCompleted();
+                        resetAdState(buttonElement);
                     },
                     onAdClosed: function() {
-                        // Ad closed by user - proceed with download
-                        handleAdCompleted();
+                        // User manually closed the ad - START DOWNLOAD
+                        console.log('Ad closed by user, starting download...');
+                        startDownloadProcess();
                     }
                 });
             } catch (error) {
                 console.error('Ad initialization error:', error);
-                // If ad fails, proceed with download
-                handleAdCompleted();
+                resetAdState(buttonElement);
             }
 
-            // Fallback: if ad doesn't complete within 30 seconds, proceed anyway
+            // Fallback: if ad doesn't close within 60 seconds, reset
             setTimeout(() => {
-                if (isDownloading) {
-                    handleAdCompleted();
+                if (isAdRunning) {
+                    console.log('Ad timeout, resetting...');
+                    resetAdState(buttonElement);
                 }
-            }, 30000);
+            }, 60000);
         }
 
-        function handleAdCompleted() {
-            // Hide ad loading overlay
-            document.getElementById('adLoadingOverlay').style.display = 'none';
+        function startDownloadProcess() {
+            if (!currentDownloadData) return;
             
-            // Start the actual download process
-            if (currentDownloadData) {
-                processDownload(
-                    currentDownloadData.imageId,
-                    currentDownloadData.imageUrl,
-                    currentDownloadData.fileName,
-                    currentDownloadData.imageCode,
-                    currentDownloadData.buttonElement
-                );
-            }
+            isDownloading = true;
+            isAdRunning = false;
+
+            const { imageId, imageUrl, fileName, imageCode, buttonElement } = currentDownloadData;
+
+            // Change button to downloading state
+            buttonElement.innerHTML = '⏳ Downloading<span class="loading-dots"></span>';
+
+            // Wait 1 second then start download (for better UX)
+            setTimeout(() => {
+                processActualDownload(imageId, imageUrl, fileName, imageCode, buttonElement);
+            }, 1000);
         }
 
-        async function processDownload(imageId, imageUrl, fileName, imageCode, buttonElement) {
-            try {
-                // Update button to downloading state
-                buttonElement.innerHTML = '⏳ Downloading<span class="loading-dots"></span>';
+        function resetAdState(buttonElement) {
+            isAdRunning = false;
+            currentDownloadData = null;
+            buttonElement.disabled = false;
+            buttonElement.innerHTML = '📥 Download';
+        }
 
+        async function processActualDownload(imageId, imageUrl, fileName, imageCode, buttonElement) {
+            try {
                 // Get user info from Telegram
                 const user = tg.initDataUnsafe.user || {};
                 const userId = user.id;
