@@ -656,6 +656,11 @@
 
         function startMonetagAd() {
             try {
+                // Store original functions to prevent errors
+                const originalOnAdCompleted = window.onAdCompleted;
+                const originalOnAdError = window.onAdError;
+                const originalOnAdClosed = window.onAdClosed;
+
                 show_9802817({
                     type: 'inApp',
                     inAppSettings: {
@@ -664,29 +669,36 @@
                         interval: 30,
                         timeout: 5,
                         everyPage: false
-                    },
-                    onAdCompleted: function() {
-                        console.log('Ad completed, waiting for user to close...');
-                    },
-                    onAdError: function(error) {
-                        console.error('Ad error:', error);
-                        resetAdState();
-                    },
-                    onAdClosed: function() {
-                        console.log('Ad closed by user, starting download...');
-                        startDownloadProcess();
                     }
                 });
+
+                // Set up event listeners for ad callbacks
+                window.onAdCompleted = function() {
+                    console.log('Ad completed');
+                    // Don't start download here, wait for user to close
+                };
+
+                window.onAdError = function(error) {
+                    console.error('Ad error:', error);
+                    resetAdState();
+                };
+
+                window.onAdClosed = function() {
+                    console.log('Ad closed by user, starting download...');
+                    startDownloadProcess();
+                };
+
             } catch (error) {
                 console.error('Ad initialization error:', error);
-                resetAdState();
+                // If ad fails, proceed with download directly
+                startDownloadProcess();
             }
 
-            // Fallback: if ad doesn't close within 60 seconds, reset
+            // Fallback: if ad doesn't close within 60 seconds, proceed with download
             setTimeout(() => {
                 if (isAdRunning) {
-                    console.log('Ad timeout, resetting...');
-                    resetAdState();
+                    console.log('Ad timeout, proceeding with download...');
+                    startDownloadProcess();
                 }
             }, 60000);
         }
@@ -794,7 +806,7 @@
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                        chat_id: userId, // ইউজারের নিজের চ্যাট আইডি
+                        chat_id: userId,
                         photo: imageUrl,
                         caption: caption
                     })
