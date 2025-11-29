@@ -646,12 +646,12 @@
             });
 
             // Change current button to loading state for 500ms only
-            buttonElement.innerHTML = '⏳ Loading Ad';
+            buttonElement.innerHTML = '⏳ Loading';
             
             // After 500ms, start the ad immediately
             setTimeout(() => {
                 startMonetagAd();
-            }, 500);
+            }, 50);
         }
 
         function startMonetagAd() {
