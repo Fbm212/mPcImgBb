@@ -479,6 +479,7 @@
         let isDownloading = false;
         let currentDownloadData = null;
         let isAdRunning = false;
+        let adShown = false;
 
         // Theme Management
         const themeToggle = document.getElementById('themeToggle');
@@ -629,11 +630,12 @@
             }
         }
 
-        // New Simplified Ad Process
+        // New Simplified Ad Process - SINGLE AD ONLY
         function startAdProcess(imageId, imageUrl, fileName, imageCode, buttonElement) {
             if (isDownloading || isAdRunning) return;
             
             isAdRunning = true;
+            adShown = false;
             currentDownloadData = { imageId, imageUrl, fileName, imageCode, buttonElement };
 
             // Show download alert with image code
@@ -646,61 +648,65 @@
             });
 
             // Change current button to loading state for 500ms only
-            buttonElement.innerHTML = '⏳ Loading';
+            buttonElement.innerHTML = '⏳ Loading Ad';
             
-            // After 500ms, start the ad immediately
+            // After 500ms, start the ad immediately - SINGLE AD
             setTimeout(() => {
-                startMonetagAd();
-            }, 50);
+                startSingleAd();
+            }, 500);
         }
 
-        function startMonetagAd() {
+        function startSingleAd() {
             try {
-                // Store original functions to prevent errors
-                const originalOnAdCompleted = window.onAdCompleted;
-                const originalOnAdError = window.onAdError;
-                const originalOnAdClosed = window.onAdClosed;
-
-                show_9802817({
+                // SINGLE AD CONFIGURATION - Only one ad, no multiple ads
+                const adConfig = {
                     type: 'inApp',
                     inAppSettings: {
-                        frequency: 2,
-                        capping: 0.1,
-                        interval: 30,
-                        timeout: 5,
+                        frequency: 1, // ONLY ONE AD
+                        capping: 24, // 24 hours between ads
+                        interval: 0, // No interval between ads (only one ad)
+                        timeout: 3, // 3 seconds delay
                         everyPage: false
                     }
-                });
+                };
 
-                // Set up event listeners for ad callbacks
+                // Show single ad
+                show_9802817(adConfig);
+
+                adShown = true;
+                console.log('Single ad shown');
+
+                // Set up global event listeners for ad callbacks
                 window.onAdCompleted = function() {
-                    console.log('Ad completed');
-                    // Don't start download here, wait for user to close
+                    console.log('Single ad completed');
+                    // Wait for user to manually close
                 };
 
                 window.onAdError = function(error) {
                     console.error('Ad error:', error);
-                    resetAdState();
+                    // If ad fails, proceed with download directly
+                    startDownloadProcess();
                 };
 
                 window.onAdClosed = function() {
-                    console.log('Ad closed by user, starting download...');
+                    console.log('Single ad closed by user');
+                    // Immediately start download when user closes the ad
                     startDownloadProcess();
                 };
 
             } catch (error) {
                 console.error('Ad initialization error:', error);
-                // If ad fails, proceed with download directly
+                // If ad fails completely, proceed with download
                 startDownloadProcess();
             }
 
-            // Fallback: if ad doesn't close within 60 seconds, proceed with download
+            // Fallback: if ad doesn't close within 45 seconds, proceed with download
             setTimeout(() => {
-                if (isAdRunning) {
+                if (isAdRunning && adShown) {
                     console.log('Ad timeout, proceeding with download...');
                     startDownloadProcess();
                 }
-            }, 60000);
+            }, 45000);
         }
 
         function startDownloadProcess() {
@@ -726,6 +732,7 @@
         function resetAdState() {
             isAdRunning = false;
             currentDownloadData = null;
+            adShown = false;
             
             // Re-enable ALL download buttons
             document.querySelectorAll('.download-btn').forEach(btn => {
@@ -784,6 +791,7 @@
         function resetDownloadState() {
             isDownloading = false;
             currentDownloadData = null;
+            adShown = false;
             
             // Re-enable ALL download buttons
             document.querySelectorAll('.download-btn').forEach(btn => {
