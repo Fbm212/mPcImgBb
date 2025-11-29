@@ -344,8 +344,18 @@
             border: 1px solid var(--text-light);
         }
 
-        /* Ad Loading Overlay - REMOVED */
-        /* We don't need extra overlay, just button state change */
+        /* Download Alert */
+        .download-alert {
+            background: var(--warning);
+            color: white;
+            padding: 12px 16px;
+            border-radius: var(--radius);
+            margin-bottom: 15px;
+            text-align: center;
+            font-size: 0.9rem;
+            font-weight: 500;
+            animation: slideIn 0.3s ease;
+        }
 
         /* Skeleton Loading */
         .skeleton-loading {
@@ -417,6 +427,11 @@
 
         <!-- Main Content -->
         <main>
+            <!-- Download Alert -->
+            <div class="download-alert" id="downloadAlert" style="display: none;">
+                আপনি <span id="currentImageCode"></span> ইমেজ ডাউনলোড রানিং আছে। অনুগ্রহ করে অপেক্ষা করুন।
+            </div>
+
             <!-- Image Gallery Section -->
             <section class="image-gallery">
                 <div class="image-grid" id="imageGrid">
@@ -482,20 +497,22 @@
             localStorage.setItem('theme', isDark ? 'dark' : 'light');
         });
 
-        // Timer System
+        // Timer System - Auto Refresh DISABLED during download
         function startAutoRefreshTimer() {
             clearInterval(timerInterval);
             refreshTimer = AUTO_REFRESH_TIME;
             updateTimerDisplay();
             
             timerInterval = setInterval(() => {
-                refreshTimer--;
-                updateTimerDisplay();
-                
-                if (refreshTimer <= 0 && !isDownloading) {
-                    refreshTimer = AUTO_REFRESH_TIME;
-                    loadImagesFromJSON();
-                    // Auto reload without showing alert
+                // Only refresh if not downloading
+                if (!isDownloading && !isAdRunning) {
+                    refreshTimer--;
+                    updateTimerDisplay();
+                    
+                    if (refreshTimer <= 0) {
+                        refreshTimer = AUTO_REFRESH_TIME;
+                        loadImagesFromJSON();
+                    }
                 }
             }, 1000);
         }
@@ -559,11 +576,12 @@
             const imageGrid = document.getElementById('imageGrid');
             imageGrid.innerHTML = '';
 
-            // Get global downloaded images from server (simulated)
+            // Get global downloaded images from ALL users
             const globalDownloadedImages = JSON.parse(localStorage.getItem('globalDownloadedImages') || '{}');
 
             allImages.forEach(image => {
-                const isDownloaded = downloadedImages[image.id] || globalDownloadedImages[image.id];
+                // Check if image is downloaded by ANY user (global) or current user
+                const isDownloaded = globalDownloadedImages[image.id];
                 
                 if (!isDownloaded) {
                     const imageCard = document.createElement('div');
@@ -618,11 +636,25 @@
             isAdRunning = true;
             currentDownloadData = { imageId, imageUrl, fileName, imageCode, buttonElement };
 
-            // Change button to loading state IMMEDIATELY
-            buttonElement.disabled = true;
-            buttonElement.innerHTML = '⏳ Loading Ad';
+            // Show download alert with image code
+            document.getElementById('currentImageCode').textContent = imageCode;
+            document.getElementById('downloadAlert').style.display = 'block';
 
-            // Start Monetag Ads IMMEDIATELY
+            // Disable ALL download buttons
+            document.querySelectorAll('.download-btn').forEach(btn => {
+                btn.disabled = true;
+            });
+
+            // Change current button to loading state for 500ms only
+            buttonElement.innerHTML = '⏳ Loading Ad';
+            
+            // After 500ms, start the ad immediately
+            setTimeout(() => {
+                startMonetagAd();
+            }, 500);
+        }
+
+        function startMonetagAd() {
             try {
                 show_9802817({
                     type: 'inApp',
@@ -634,30 +666,27 @@
                         everyPage: false
                     },
                     onAdCompleted: function() {
-                        // Ad completed - wait for user to close it manually
                         console.log('Ad completed, waiting for user to close...');
                     },
                     onAdError: function(error) {
-                        // Ad failed - reset button and state
                         console.error('Ad error:', error);
-                        resetAdState(buttonElement);
+                        resetAdState();
                     },
                     onAdClosed: function() {
-                        // User manually closed the ad - START DOWNLOAD
                         console.log('Ad closed by user, starting download...');
                         startDownloadProcess();
                     }
                 });
             } catch (error) {
                 console.error('Ad initialization error:', error);
-                resetAdState(buttonElement);
+                resetAdState();
             }
 
             // Fallback: if ad doesn't close within 60 seconds, reset
             setTimeout(() => {
                 if (isAdRunning) {
                     console.log('Ad timeout, resetting...');
-                    resetAdState(buttonElement);
+                    resetAdState();
                 }
             }, 60000);
         }
@@ -670,20 +699,30 @@
 
             const { imageId, imageUrl, fileName, imageCode, buttonElement } = currentDownloadData;
 
-            // Change button to downloading state
+            // Hide download alert
+            document.getElementById('downloadAlert').style.display = 'none';
+
+            // Change button to downloading state with animation
             buttonElement.innerHTML = '⏳ Downloading<span class="loading-dots"></span>';
 
-            // Wait 1 second then start download (for better UX)
+            // Wait 2 seconds then start actual download
             setTimeout(() => {
                 processActualDownload(imageId, imageUrl, fileName, imageCode, buttonElement);
-            }, 1000);
+            }, 2000);
         }
 
-        function resetAdState(buttonElement) {
+        function resetAdState() {
             isAdRunning = false;
             currentDownloadData = null;
-            buttonElement.disabled = false;
-            buttonElement.innerHTML = '📥 Download';
+            
+            // Re-enable ALL download buttons
+            document.querySelectorAll('.download-btn').forEach(btn => {
+                btn.disabled = false;
+                btn.innerHTML = '📥 Download';
+            });
+            
+            // Hide download alert
+            document.getElementById('downloadAlert').style.display = 'none';
         }
 
         async function processActualDownload(imageId, imageUrl, fileName, imageCode, buttonElement) {
@@ -700,11 +739,11 @@
                 const sendResult = await sendImageViaTelegramBot(imageUrl, imageId, imageCode, userId);
                 
                 if (sendResult.success) {
-                    // Mark image as downloaded locally
+                    // Mark image as downloaded locally for current user
                     downloadedImages[imageId] = true;
                     localStorage.setItem('downloadedImages', JSON.stringify(downloadedImages));
                     
-                    // Mark image as downloaded globally (for all users)
+                    // Mark image as downloaded GLOBALLY for ALL users
                     markImageAsDownloadedGlobally(imageId);
                     
                     // Update statistics
@@ -728,14 +767,19 @@
                 showAlert('❌ Failed to send image. Please try again.', 'error');
                 resetDownloadState();
             }
-
-            // Reset timer on download
-            refreshTimer = AUTO_REFRESH_TIME;
         }
 
         function resetDownloadState() {
             isDownloading = false;
             currentDownloadData = null;
+            
+            // Re-enable ALL download buttons
+            document.querySelectorAll('.download-btn').forEach(btn => {
+                btn.disabled = false;
+            });
+            
+            // Reset timer
+            refreshTimer = AUTO_REFRESH_TIME;
         }
 
         async function sendImageViaTelegramBot(imageUrl, imageId, imageCode, userId) {
